@@ -17,5 +17,5 @@ golang 代理服务器，go Proxy Server
 		func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request)// 处理
 		func (p *Proxy) ListenAndServ() error 								// 监听
 		func (p *Proxy) Serve(l net.Listener) error							// 监听
-		func (p *Proxy) Close() error										//关闭代理
+		func (p *Proxy) Close() error										// 关闭代理
 	
