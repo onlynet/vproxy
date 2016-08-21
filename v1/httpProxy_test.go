@@ -21,7 +21,7 @@ func Test_httpProxy_ServeHTTP(t *testing.T) {
         {req:"GET http://www.baidu.com:80/index.html HTTP/1.0\r\nHost:abcdef\r\nConnection:Close\r\n\r\n", statusCode:200},
         {req:"GET http://www.baidu.com:80/ HTTP/1.1\r\nHost:abcdef\r\nConnection:Keep-Alive\r\n\r\n", statusCode:200},
         {req:"GET /index.html?123 HTTP/1.1\r\nHost:www.baidu.com:80\r\nConnection:Keep-Alive\r\n\r\n", statusCode:200},
-        {req:"GET https://www.taobao.com:443/?124 HTTP/1.1\r\nHost:www.taobao.com\r\nConnection:Keep-Alive\r\n\r\n", statusCode:200},
+        {req:"GET https://translate.google.com:443/?124 HTTP/1.1\r\nHost:translate.google.com\r\nConnection:Keep-Alive\r\n\r\n", statusCode:200},
         {req:"GET https://kyfw.12306.cn/otn/regist/init HTTP/1.1\r\nHost:kyfw.12306.cn\r\nConnection:Keep-Alive\r\n\r\n", statusCode:502},
     }
 
