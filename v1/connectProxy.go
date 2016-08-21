@@ -2,8 +2,8 @@ package vproxy
 
 import (
 	"net/http"
-    //"fmt"
     "net"
+    "github.com/456vv/vconnpool/v1"
 )
 var resultStatus200 = []byte("HTTP/1.1 200 Connection Established\r\n\r\n")
 
@@ -24,11 +24,19 @@ func (cp *connectProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request){
 
     hj, ok := rw.(http.Hijacker)
 	if !ok {
+        if conn, ok := netConn.(vconnpool.Conn); ok {
+            conn.Discard()
+        }
+        netConn.Close()
 		http.Error(rw, "webserver doesn't support hijacking", http.StatusInternalServerError)
 		return
 	}
 	conn, _, err := hj.Hijack()
 	if err != nil {
+        if conn, ok := netConn.(vconnpool.Conn); ok {
+            conn.Discard()
+        }
+        netConn.Close()
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -36,7 +44,7 @@ func (cp *connectProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request){
     conn.Write(resultStatus200)
 
     var bufSize int = defaultDataBufioSize
-    if cp.config != nil {
+    if cp.config != nil && cp.config.DataBufioSize != 0 {
         bufSize = cp.config.DataBufioSize
     }
 

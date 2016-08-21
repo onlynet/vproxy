@@ -1,12 +1,9 @@
 package vproxy
 
 import (
-    //"reflect"
 	"net/http"
     "net"
-    //"log"
     "time"
-    //"fmt"
     "io"
 )
 

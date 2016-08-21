@@ -2,7 +2,6 @@ package vproxy
 
 import (
 	"net/http"
-    //"fmt"
     "io"
     "strings"
 )
@@ -94,7 +93,7 @@ func (hp *httpProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request){
 	}
 
     var bufSize int = defaultDataBufioSize
-    if hp.config != nil {
+    if hp.config != nil && hp.config.DataBufioSize != 0 {
         bufSize = hp.config.DataBufioSize
     }
 
