@@ -1,21 +1,36 @@
 # vproxy [![Build Status](https://travis-ci.org/456vv/vproxy.svg?branch=master)](https://travis-ci.org/456vv/vproxy)
 go/golang HTTP/HTTPS proxy server, HTTP/HTTPS 代理服务器
 <br />
-最近更新20160821：<a href="/v1/update.txt">update.txt</a>
+最近更新20160914：<a href="/v1/update.txt">update.txt</a>
 <br/>
 已编译好的二进制文件下载：暂不提供
 <br />
 列表：
 -----------------------------------
     const defaultDataBufioSize    = 1<<20                                            // 默认数据缓冲1MB
+    type LogLevel int                                                                // 日志级别
+    const (
+        OriginAddr LogLevel    = iota+1                                              // 客户端。
+        Authenticate                                                                 // 认证
+        Host                                                                         // 访问的Host地址
+        URI                                                                          // 路径
+        Request                                                                      // 请求
+        Response                                                                     // 响应
+        Error                                                                        // 错误
+    )
     type Config struct {                                                     // 配置
-        DataBufioSize int                                                            // 缓冲区大小
+        DataBufioSize   int                                                          // 缓冲区大小
+        Auth            func(username, password string) bool                         // 认证
+        Timeout         time.Duration                                                // 转发连接请求超时
+        Deadline        time.Time                                                    // 转发连接请求超时
     }
     type Proxy struct {                                                      // 代理
+        *Config                                                                      // 配置
         Addr        string                                                           // 代理IP地址
         Server      http.Server                                                      // 服务器
         Transport   http.RoundTripper                                                // 代理
-        *Config                                                                      // 配置
+        ErrorLogLevel LogLevel                                                       // 日志级别
+        ErrorLog    *log.Logger                                                      // 日志
         l           net.Listener                                                     // 连接对象
     }
         func (p *Proxy) setDefault()                                                 // 设置默认
