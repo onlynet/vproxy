@@ -5,13 +5,15 @@ import (
     "net"
     //"io/ioutil"
     //"io"
-    //"net/url"
+    "os"
     "net/http"
     "bufio"
     //"bytes"
+    "context"
     "time"
     "fmt"
     "crypto/tls"
+    "log"
 )
 func Test_httpProxy_ServeHTTP(t *testing.T) {
     tests := []struct{
@@ -22,7 +24,7 @@ func Test_httpProxy_ServeHTTP(t *testing.T) {
         {req:"GET http://www.baidu.com:80/ HTTP/1.1\r\nHost:abcdef\r\nConnection:Keep-Alive\r\n\r\n", statusCode:200},
         {req:"GET /index.html?123 HTTP/1.1\r\nHost:www.baidu.com:80\r\nConnection:Keep-Alive\r\n\r\n", statusCode:200},
         {req:"GET https://translate.google.com:443/?124 HTTP/1.1\r\nHost:translate.google.com\r\nConnection:Keep-Alive\r\n\r\n", statusCode:200},
-        {req:"GET https://kyfw.12306.cn/otn/regist/init HTTP/1.1\r\nHost:kyfw.12306.cn\r\nConnection:Keep-Alive\r\n\r\n", statusCode:502},
+        {req:"GET https://kyfw.12306.cn/ HTTP/1.1\r\nHost:kyfw.12306.cn\r\nConnection:Keep-Alive\r\n\r\n", statusCode:502},
     }
 
     //服务器
@@ -35,7 +37,9 @@ func Test_httpProxy_ServeHTTP(t *testing.T) {
         transport       : &http.Transport{
         //Proxy: func(*Request) (*url.URL, error), Dial: func(network, addr string) (net.Conn, error),
             DialTLS: func(network, addr string) (net.Conn, error){
-    			rc, err := net.Dial("tcp", addr)
+                ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second*3))
+                defer cancel()
+    			rc, err := new(net.Dialer).DialContext(ctx, "tcp", addr)
     			if err != nil {
     				return nil, err
     			}
@@ -44,9 +48,11 @@ func Test_httpProxy_ServeHTTP(t *testing.T) {
     			return tls.Client(rc, tlsConfig), nil
             },
             TLSClientConfig: tlsConfig,
-        //DisableKeepAlives: bool, DisableCompression: bool, MaxIdleConnsPerHost: int, ResponseHeaderTimeout: time.Duration, TLSHandshakeTimeout: time.Duration, ExpectContinueTimeout: time.Duration, TLSNextProto: map[string]func(authority string, c *tls.Conn),}{
+            TLSHandshakeTimeout: time.Second*3,
+        //DisableKeepAlives: bool, DisableCompression: bool, MaxIdleConnsPerHost: int, ResponseHeaderTimeout: time.Duration, ExpectContinueTimeout: time.Duration, TLSNextProto: map[string]func(authority string, c *tls.Conn),}{
 
         },
+        proxy : &Proxy{ErrorLog:log.New(os.Stdout, "", log.LstdFlags),ErrorLogLevel: Error},
     }
     srv := &http.Server{
         Handler: http.HandlerFunc(hp.ServeHTTP),
@@ -55,6 +61,7 @@ func Test_httpProxy_ServeHTTP(t *testing.T) {
     if err != nil {
         t.Fatal(err)
     }
+    defer l.Close()
     laddr := l.Addr().String()
     fmt.Println("服务器IP: ", laddr)
 
@@ -66,11 +73,13 @@ func Test_httpProxy_ServeHTTP(t *testing.T) {
         if err != nil {
             t.Fatalf("连接 %s 地址发生错误：%s", laddr, err)
         }
+        defer netConn.Close()
         netConn.Write([]byte(test.req))
         httpResponse, err := http.ReadResponse(bufio.NewReader(netConn), &http.Request{})
         if err != nil {
             t.Fatalf("连接 %s 地址，返回内容发生错误：%s", test.req, err)
         }
+        defer httpResponse.Body.Close()
         if httpResponse.StatusCode != test.statusCode {
             t.Fatalf("连接 %s 地址，返回状态码不是200，是：%d", test.req, httpResponse.StatusCode)
         }

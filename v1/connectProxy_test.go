@@ -5,12 +5,14 @@ import (
     "net"
     "io/ioutil"
     "io"
-    //"net/url"
+    "os"
     "net/http"
     "bufio"
     "bytes"
     "time"
     "fmt"
+    "context"
+    "log"
 )
 func Test_connectProxy_ServeHTTP(t *testing.T) {
     tests := []struct{
@@ -23,9 +25,16 @@ func Test_connectProxy_ServeHTTP(t *testing.T) {
 
     c := &Config{
         DataBufioSize:1024,
+        Timeout: time.Second*5,
     }
     cp := &connectProxy{
         config: c,
+        transport: &http.Transport{
+            DialContext: func(ctx context.Context, network, addr string) (net.Conn, error){
+                return new(net.Dialer).DialContext(ctx, network, addr)
+            },
+        },
+        proxy : &Proxy{ErrorLog:log.New(os.Stdout, "", log.LstdFlags),ErrorLogLevel: Error},
     }
     srv := &http.Server{
         Handler: http.HandlerFunc(cp.ServeHTTP),
@@ -53,7 +62,7 @@ func Test_connectProxy_ServeHTTP(t *testing.T) {
             t.Fatal(err)
         }
         if !bytes.Equal(line, resultStatus200NoCRCL) {
-            t.Fatalf("返回的内容是： %v，实际内容是：%v", line, resultStatus200NoCRCL)
+            t.Fatalf("返回的状态是： %s，实际状态是：%s", line, resultStatus200NoCRCL)
         }
         bufioReader.Reset(netConn)
 

@@ -3,21 +3,67 @@ package vproxy
 import (
 	"net/http"
     "net"
+    "context"
+    "time"
     "github.com/456vv/vconnpool/v1"
 )
+
 var resultStatus200 = []byte("HTTP/1.1 200 Connection Established\r\n\r\n")
 
 type connectProxy struct{
     config      *Config
     transport   http.RoundTripper
+    proxy       *Proxy
 }
-func (cp *connectProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request){
-    dial := net.Dial
-    if tr, ok := cp.transport.(*http.Transport); ok && tr.Dial != nil {
-        dial = tr.Dial
+
+func minNonzeroTime(a, b time.Time) time.Time {
+	if a.IsZero() {
+		return b
+	}
+	if b.IsZero() || a.Before(b) {
+		return a
+	}
+	return b
+}
+
+func (cp *connectProxy) deadline(ctx context.Context, now time.Time) (earliest time.Time) {
+    if cp.config.Timeout != 0 {
+        earliest = now.Add(cp.config.Timeout)
     }
-    netConn, err := dial("tcp", req.Host)
+    if d, ok := ctx.Deadline(); ok {
+    	earliest = minNonzeroTime(earliest, d)
+    }
+    return minNonzeroTime(earliest, cp.config.Deadline)
+}
+
+func (cp *connectProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request){
+    var netConn net.Conn
+    var err error
+
+    var ctx context.Context = req.Context()
+    deadline := cp.deadline(ctx, time.Now())
+    if !deadline.IsZero() {
+        if d, ok := ctx.Deadline(); !ok || deadline.Before(d) {
+            subCtx, cancel := context.WithDeadline(ctx, deadline)
+            defer cancel()
+            ctx = subCtx
+        }
+    }
+
+    if tr, ok := cp.transport.(*http.Transport); ok{
+        if tr.DialContext != nil {
+            netConn, err = tr.DialContext(ctx, "tcp", req.Host)
+        }else if tr.Dial != nil {
+            netConn, err = tr.Dial("tcp", req.Host)
+        }
+    }
+
+    if netConn == nil {
+        netConn, err = new(net.Dialer).DialContext(ctx, "tcp", req.Host)
+    }
+
     if err != nil {
+        cp.proxy.logf(Error, "", err.Error())
 		http.Error(rw, err.Error(), http.StatusBadGateway)
 		return
     }
@@ -28,7 +74,8 @@ func (cp *connectProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request){
             conn.Discard()
         }
         netConn.Close()
-		http.Error(rw, "webserver doesn't support hijacking", http.StatusInternalServerError)
+        cp.proxy.logf(Error, "", "代理服务器不支持劫持客户端连接转TCP")
+		http.Error(rw, "proxy server doesn't support hijacking", http.StatusInternalServerError)
 		return
 	}
 	conn, _, err := hj.Hijack()
@@ -37,6 +84,7 @@ func (cp *connectProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request){
             conn.Discard()
         }
         netConn.Close()
+        cp.proxy.logf(Error, "", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}

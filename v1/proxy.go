@@ -1,25 +1,45 @@
 package vproxy
 
 import (
-	"net/http"
+    "net/http"
     "net"
     "time"
     "io"
+    "encoding/base64"
+    "strings"
+    "log"
+    "fmt"
 )
-
 
 const defaultDataBufioSize    = 1<<20                                                       // 默认数据缓冲1MB
 
+type LogLevel int
+const (
+    OriginAddr LogLevel    = iota+1 // 登录 vproxy 每个请求的目标。
+    Authenticate                    // 认证
+    Host                            // 访问的Host地址
+    URI                             // 路径
+    Request                         // 显示报头解析
+    Response                        // 日志写入到网络的所有数据
+    Error                           // 非致命错误
+)
+
+
 //Config 配置
 type Config struct {
-    DataBufioSize int                                                                       // 缓冲区大小
+    DataBufioSize   int                                                                     // 缓冲区大小
+    Auth            func(username, password string) bool                                    // 认证
+    Timeout         time.Duration                                                           // 转发连接请求超时
+    Deadline        time.Time                                                               // 转发连接请求超时
 }
 
 type Proxy struct {
+    *Config                                                                                 // 配置
     Addr        string                                                                      // 代理IP地址
     Server      http.Server                                                                 // 服务器
     Transport   http.RoundTripper                                                           // 代理
-    *Config                                                                                 // 配置
+    ErrorLog    *log.Logger                                                                 // 日志
+    ErrorLogLevel LogLevel                                                                  // 日志级别
     l           net.Listener                                                                // 连接对象
 }
 
@@ -44,17 +64,43 @@ func (p *Proxy) initServer() *http.Server {
 //      rw http.ResponseWriter  响应
 //      req *http.Request       请求
 func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request){
+    p.logf(OriginAddr, "", "客户端IP: %s", req.RemoteAddr)
+
+    //认证用户密码
+    if p.Auth != nil {
+        auth := req.Header.Get("Proxy-Authorization")
+        if auth == "" {
+            p.logf(Error, "", "请求标头 Proxy-Authorization 没有被设置？")
+            http.Error(rw, "Proxy server requires authentication to log in!", http.StatusProxyAuthRequired)
+            return
+        }
+        username, password, ok := parseBasicAuth(auth)
+        p.logf(Authenticate, "", "认证用户：%s，密码：%s", username, password)
+        if !ok || !p.Auth(username, password){
+            p.logf(Error, "", "用户或密码认证不通过？")
+            http.Error(rw, "User or password is not valid!", http.StatusProxyAuthRequired)
+            return
+        }
+    }
+
+    p.logf(Host, "", "Host: %s", req.Host)
+    p.logf(URI, "", "URI: %s", req.RequestURI)
+    p.logf(Request, "", "请求：\r\n%s", forType(req, ""))
+
+    //请求
     switch req.Method {
-    	case "CONNECT":
+        case "CONNECT":
             cp := &connectProxy{
                 config      : p.Config,
                 transport   : p.Transport,
+                proxy       : p,
             }
             cp.ServeHTTP(rw, req)
-    	default:
+        default:
             hp := &httpProxy{
                 config      : p.Config,
                 transport   : p.Transport,
+                proxy       : p,
             }
             hp.ServeHTTP(rw, req)
     }
@@ -72,7 +118,7 @@ func (p *Proxy) ListenAndServ() error {
     }
     l, err := net.Listen("tcp", addr)
     if err != nil {
-    	return err
+        return err
     }
     p.l = l
     p.Addr = l.Addr().String()
@@ -104,24 +150,46 @@ func (p *Proxy) Close() error {
     return p.l.Close()
 }
 
+func (p *Proxy) logf(level LogLevel, funcName, format string, v ...interface{}){
+    if p.ErrorLog != nil && p.ErrorLogLevel >= level {
+        p.ErrorLog.Printf(fmt.Sprint(funcName, "->", format), v...)
+    }
+}
+
 func copyDate(dst io.Writer, src io.ReadCloser, bufSize int) (n int64, err error){
     defer src.Close()
     buf := make([]byte, bufSize)
     return io.CopyBuffer(dst, src, buf)
 }
 
+func parseBasicAuth(auth string) (username, password string, ok bool) {
+    const prefix = "Basic "
+    if !strings.HasPrefix(auth, prefix) {
+        return
+    }
+    c, err := base64.StdEncoding.DecodeString(auth[len(prefix):])
+    if err != nil {
+        return
+    }
+    cs := string(c)
+    s := strings.IndexByte(cs, ':')
+    if s < 0 {
+        return
+    }
+    return cs[:s], cs[s+1:], true
+}
 
 
 type tcpKeepAliveListener struct {
-	*net.TCPListener
+    *net.TCPListener
 }
 
 func (ln tcpKeepAliveListener) Accept() (c net.Conn, err error) {
-	tc, err := ln.AcceptTCP()
-	if err != nil {
-		return
-	}
-	tc.SetKeepAlive(true)
-	tc.SetKeepAlivePeriod(3 * time.Minute)
-	return tc, nil
+    tc, err := ln.AcceptTCP()
+    if err != nil {
+        return
+    }
+    tc.SetKeepAlive(true)
+    tc.SetKeepAlivePeriod(3 * time.Minute)
+    return tc, nil
 }

@@ -13,6 +13,9 @@ func Test_Proxy_0(t *testing.T) {
 
     c := &Config{
         DataBufioSize:1024,
+        Auth: func(username, password string) bool{
+            return true
+        },
     }
     p := &Proxy{
         Addr        : "127.0.0.1:1101",
@@ -37,12 +40,12 @@ func Test_Proxy_0(t *testing.T) {
     }
     go func(){
         fmt.Println("服务器IP：", p.Addr)
-        time.Sleep(time.Second*2)
+        time.Sleep(time.Second*10)
         p.Close()
     }()
     err := p.ListenAndServ()
     if err != nil {
-    	t.Log("%s", err)
+    	t.Logf("%s", err)
     }
 
 
