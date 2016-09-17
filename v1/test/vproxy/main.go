@@ -14,22 +14,24 @@ import (
     "context"
 )
 
-var flog = flag.String("log", "", "日志文件(默认在控制台显示日志)  (format \"./vproxy.txt\")")
-var fuser = flag.String("user", "", "用户名")
-var fpwd = flag.String("pwd", "", "密码")
-var flogLevel = flag.Int("logLevel", 0, "日志级别，0)不记录 1)客户端IP 2)认证 3)访问的Host地址 4)路径 5)请求 6)响应 7)错误")
-var faddr = flag.String("addr", "", "代理服务器地 (format \"0.0.0.0:8080\")")
-var fproxy = flag.String("proxy", "", "代理服务器的上级代理IP地址 (format \"11.22.33.44:8888\")")
-var fmaxIdleConns = flag.Int("maxIdleConns", 500, "保持空闲连接(TCP)数量")
-var fmaxIdleConnsPerHost = flag.Int("maxIdleConnsPerHost", 500, "保持空闲连接(Host)数量")
-var fdisableKeepAlives = flag.Bool("disableKeepAlives", false, "禁止长连接 (default false)")
-var fdisableCompression = flag.Bool("disableCompression", false, "禁止传送数据时候进行压缩 (default false)")
-var ftlsHandshakeTimeout = flag.Int64("tlsHandshakeTimeout", 10000, "SSL握手超时，单位毫秒")
-var fidleConnTimeout = flag.Int64("idleConnTimeout", 0, "空闲连接超时时，单位毫秒")
-var fexpectContinueTimeout = flag.Int64("expectContinueTimeout", 1000, "http1.1过度到http2的等待超时，单位毫秒")
-var fresponseHeaderTimeout = flag.Int64("responseHeaderTimeout", 0, "读取服务器发来的文件标头超时，单位毫秒 (default 0)")
-var fdataBufioSize = flag.Int("dataBufioSize", 1024*10, "代理数据交换缓冲区大小，单位字节")
-var ftimeout = flag.Int64("timeout", 5000, "转发连接请求超时，单位毫秒")
+var (
+    flog = flag.String("log", "", "日志文件(默认留空在控制台显示日志)  (format \"./vproxy.txt\")")
+    fuser = flag.String("user", "", "用户名")
+    fpwd = flag.String("pwd", "", "密码")
+    flogLevel = flag.Int("logLevel", 0, "日志级别，0)不记录 1)客户端IP 2)认证 3)访问的Host地址 4)路径 5)请求 6)响应 7)错误 (default 0)")
+    faddr = flag.String("addr", "", "代理服务器地 (format \"0.0.0.0:8080\")")
+    fproxy = flag.String("proxy", "", "代理服务器的上级代理IP地址 (format \"11.22.33.44:8888\")")
+    fmaxIdleConns = flag.Int("maxIdleConns", 500, "保持空闲连接(TCP)数量")
+    fmaxIdleConnsPerHost = flag.Int("maxIdleConnsPerHost", 500, "保持空闲连接(Host)数量")
+    fdisableKeepAlives = flag.Bool("disableKeepAlives", false, "禁止长连接 (default false)")
+    fdisableCompression = flag.Bool("disableCompression", false, "禁止传送数据时候进行压缩 (default false)")
+    ftlsHandshakeTimeout = flag.Int64("tlsHandshakeTimeout", 10000, "SSL握手超时，单位毫秒")
+    fidleConnTimeout = flag.Int64("idleConnTimeout", 0, "空闲连接超时时，单位毫秒 (default 0)")
+    fexpectContinueTimeout = flag.Int64("expectContinueTimeout", 1000, "http1.1过度到http2的等待超时，单位毫秒")
+    fresponseHeaderTimeout = flag.Int64("responseHeaderTimeout", 0, "读取服务器发来的文件标头超时，单位毫秒 (default 0)")
+    fdataBufioSize = flag.Int("dataBufioSize", 1024*10, "代理数据交换缓冲区大小，单位字节")
+    ftimeout = flag.Int64("timeout", 5000, "转发连接请求超时，单位毫秒")
+)
 
 func main(){
     flag.Parse()
@@ -77,6 +79,8 @@ func main(){
             return r.URL, nil
         }
         tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error){
+            ctx, cancel := context.WithTimeout(ctx, p.Config.Timeout)
+            defer cancel()
         	return new(net.Dialer).DialContext(ctx, network, *fproxy)
         }
     }
