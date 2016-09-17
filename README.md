@@ -7,7 +7,7 @@ go/golang HTTP/HTTPS proxy server, HTTP/HTTPS 代理服务器
 <br />
 命令行：
 -----------------------------------
-   命令行例子：vproxy -addr 0.0.0.0:8080
+    命令行例子：vproxy -addr 0.0.0.0:8080
     -addr string
           代理服务器地 (format "0.0.0.0:8080")
     -proxy string
