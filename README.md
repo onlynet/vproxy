@@ -3,7 +3,7 @@ go/golang HTTP/HTTPS proxy server, HTTP/HTTPS 代理服务器
 <br />
 最近更新20160914：<a href="/v1/update.txt">update.txt</a>
 <br/>
-已编译好的二进制文件下载：暂不提供
+已编译好的二进制文件下载：<a href="https://github.com/456vv/vproxy/raw/master/v1/test/bin/vproxy%20Alpha.zip">vproxy Alpha.zip</a>
 <br />
 命令行：
 -----------------------------------
