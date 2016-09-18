@@ -147,7 +147,10 @@ func (p *Proxy) Close() error {
     if tr, ok := p.Transport.(*http.Transport); ok {
         tr.CloseIdleConnections()
     }
-    return p.l.Close()
+    if p.l != nil {
+        return p.l.Close()
+    }
+    return nil
 }
 
 func (p *Proxy) logf(level LogLevel, funcName, format string, v ...interface{}){
