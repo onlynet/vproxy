@@ -7,6 +7,7 @@ import (
     "io"
     "os"
     "net/http"
+    //"net/url"
     "bufio"
     "bytes"
     "time"
@@ -30,6 +31,9 @@ func Test_connectProxy_ServeHTTP(t *testing.T) {
     cp := &connectProxy{
         config: c,
         transport: &http.Transport{
+            //Proxy: func(req *http.Request) (*url.URL, error){
+            //    return req.URL, nil
+            //},
             DialContext: func(ctx context.Context, network, addr string) (net.Conn, error){
                 return new(net.Dialer).DialContext(ctx, network, addr)
             },
@@ -73,7 +77,7 @@ func Test_connectProxy_ServeHTTP(t *testing.T) {
             t.Fatal(err)
         }
         if resp.StatusCode != http.StatusOK {
-            t.Fatal("返回的状态号不是200，是：%d", resp.StatusCode)
+            t.Fatalf("返回的状态号不是200，是：%d", resp.StatusCode)
         }
         io.Copy(ioutil.Discard, resp.Body)
         resp.Body.Close()
