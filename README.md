@@ -1,7 +1,7 @@
 # vproxy [![Build Status](https://travis-ci.org/456vv/vproxy.svg?branch=master)](https://travis-ci.org/456vv/vproxy)
 go/golang HTTP/HTTPS proxy server, HTTP/HTTPS 代理服务器
 <br />
-最近更新20160914：<a href="/v1/update.txt">update.txt</a>
+最近更新20160920：<a href="/v1/update.txt">update.txt</a>
 <br/>
 已编译好的二进制文件下载：<a href="https://github.com/456vv/vproxy/raw/master/v1/test/bin/vproxy%20Alpha.zip">vproxy Alpha.zip</a>
 <br />
